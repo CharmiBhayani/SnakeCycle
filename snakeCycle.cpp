@@ -247,11 +247,12 @@ private:
     int value;
 public:
     Food() : position(0, 0), symbol('*'), color(LIGHT_RED), value(10) {}
-    void generateFood(int width, int height, const std::vector<Position>& snakeBody) {
+    void generateFood(int width, int height, const std::vector<Position>& body1, const std::vector<Position>& body2) {
         do {
             position.x = rand() % width;
             position.y = rand() % height;
-        } while (std::find(snakeBody.begin(), snakeBody.end(), position) != snakeBody.end());
+        } while (std::find(body1.begin(), body1.end(), position) != body1.end() ||
+                 std::find(body2.begin(), body2.end(), position) != body2.end());
 
         if (rand() % 10 == 0) {
             symbol = '$';
@@ -276,12 +277,11 @@ private:
     std::vector<Position> previousBody;
     Direction direction;
     bool growing;
+    int startX;
+    int startY;
 public:
-    Snake() : direction(STOP), growing(false) {
-        body.emplace_back(10, 10);
-        body.emplace_back(9, 10);
-        body.emplace_back(8, 10);
-        previousBody = body;
+    Snake(int x = 10, int y = 10) : direction(STOP), growing(false), startX(x), startY(y) {
+        reset();
     }
 
     void setDirection(Direction dir) {
@@ -336,9 +336,9 @@ public:
 
     void reset() {
         body.clear();
-        body.emplace_back(10, 10);
-        body.emplace_back(9, 10);
-        body.emplace_back(8, 10);
+        body.emplace_back(startX, startY);
+        body.emplace_back(startX - 1, startY);
+        body.emplace_back(startX - 2, startY);
         previousBody = body;
         direction = STOP;
         growing = false;
@@ -350,17 +350,20 @@ class GameBoard {
 private:
     int width, height;
     bool borderDrawn;
-    int lastScore;
+    bool headerDrawn;
+    int lastScore1;
+    int lastScore2;
     int lastHighScore;
-    int lastLength;
+    int lastLength1;
+    int lastLength2;
     std::string lastLevel;
     bool wasPaused;
 
 public:
     GameBoard(int w = 30, int h = 20)
-        : width(w), height(h), borderDrawn(false),
-          lastScore(-1), lastHighScore(-1), lastLength(-1),
-          lastLevel(""), wasPaused(false) {}
+        : width(w), height(h), borderDrawn(false), headerDrawn(false),
+          lastScore1(-1), lastScore2(-1), lastHighScore(-1),
+          lastLength1(-1), lastLength2(-1), lastLevel(""), wasPaused(false) {}
 
     int getWidth() const { return width; }
     int getHeight() const { return height; }
@@ -441,8 +444,7 @@ public:
         }
     }
 
-    void displayHeader(int score, int highScore, int length, const std::string& level) {
-        static bool headerDrawn = false;
+    void displayHeader(int score1, int score2, int highScore, int length1, int length2, const std::string& level) {
         if (!headerDrawn) {
             Console::setColor(LIGHT_CYAN);
             Console::gotoxy(0, 0);
@@ -453,76 +455,84 @@ public:
             std::cout << "+========================================================+";
 
             Console::setColor(YELLOW);
-            Console::gotoxy(width + 5, 5);
-            std::cout << "+----------- STATS -----------+";
-            Console::gotoxy(width + 5, 10);
+            Console::gotoxy(width + 5, 4);
+            std::cout << "+----------- STATS ----------+";
+            Console::gotoxy(width + 5, 11);
             std::cout << "+----------------------------+";
 
             Console::setColor(LIGHT_MAGENTA);
-            Console::gotoxy(width + 5, 12);
+            Console::gotoxy(width + 5, 13);
             std::cout << "+--------- CONTROLS ---------+";
             Console::setColor(WHITE);
-            Console::gotoxy(width + 5, 13);
-            std::cout << "| W/UP - Move Up             |";
             Console::gotoxy(width + 5, 14);
-            std::cout << "| S/DOWN - Move Down         |";
+            std::cout << "| P1 (Arrows)  P2 (WASD)     |";
             Console::gotoxy(width + 5, 15);
-            std::cout << "| A/LEFT - Move Left         |";
-            Console::gotoxy(width + 5, 16);
-            std::cout << "| D/RIGHT - Move Right       |";
-            Console::gotoxy(width + 5, 17);
             std::cout << "| P - Pause Game             |";
-            Console::gotoxy(width + 5, 18);
+            Console::gotoxy(width + 5, 16);
             std::cout << "| Q - Quit Game              |";
             Console::setColor(LIGHT_MAGENTA);
-            Console::gotoxy(width + 5, 19);
+            Console::gotoxy(width + 5, 17);
             std::cout << "+----------------------------+";
 
             Console::setColor(CYAN);
-            Console::gotoxy(width + 5, 21);
+            Console::gotoxy(width + 5, 19);
             std::cout << "+------ FOOD TYPES ------+";
-            Console::gotoxy(width + 5, 22);
+            Console::gotoxy(width + 5, 20);
             Console::setColor(LIGHT_RED);
             std::cout << "| * ";
             Console::setColor(WHITE);
             std::cout << "- Normal Food (+10) |";
-            Console::gotoxy(width + 5, 23);
+            Console::gotoxy(width + 5, 21);
             Console::setColor(LIGHT_YELLOW);
             std::cout << "| $ ";
             Console::setColor(WHITE);
             std::cout << "- Special Food (+50) |";
             Console::setColor(CYAN);
-            Console::gotoxy(width + 5, 24);
+            Console::gotoxy(width + 5, 22);
             std::cout << "+------------------------+";
 
             headerDrawn = true;
         }
 
-        if (score != lastScore) {
+        if (score1 != lastScore1) {
+            Console::gotoxy(width + 5, 5);
+            Console::setColor(WHITE);
+            std::cout << "| P1 Score: " << std::setw(14) << score1 << " |";
+            lastScore1 = score1;
+        }
+
+        if (length1 != lastLength1) {
             Console::gotoxy(width + 5, 6);
             Console::setColor(WHITE);
-            std::cout << "| Score: " << std::setw(16) << score << " |";
-            lastScore = score;
+            std::cout << "| P1 Length: " << std::setw(13) << length1 << " |";
+            lastLength1 = length1;
+        }
+
+        if (score2 != lastScore2) {
+            Console::gotoxy(width + 5, 7);
+            Console::setColor(WHITE);
+            std::cout << "| P2 Score: " << std::setw(14) << score2 << " |";
+            lastScore2 = score2;
+        }
+
+        if (length2 != lastLength2) {
+            Console::gotoxy(width + 5, 8);
+            Console::setColor(WHITE);
+            std::cout << "| P2 Length: " << std::setw(13) << length2 << " |";
+            lastLength2 = length2;
         }
 
         if (highScore != lastHighScore) {
-            Console::gotoxy(width + 5, 7);
+            Console::gotoxy(width + 5, 9);
             Console::setColor(WHITE);
-            std::cout << "| High Score: " << std::setw(11) << highScore << " |";
+            std::cout << "| High Score: " << std::setw(12) << highScore << " |";
             lastHighScore = highScore;
         }
 
-        if (length != lastLength) {
-            Console::gotoxy(width + 5, 8);
-            Console::setColor(WHITE);
-            std::cout << "| Length: " << std::setw(15) << length << " |";
-            lastLength = length;
-        }
-
         if (level != lastLevel) {
-            Console::gotoxy(width + 5, 9);
+            Console::gotoxy(width + 5, 10);
             Console::setColor(WHITE);
-            std::cout << "| Level: " << std::setw(16) << level << " |";
+            std::cout << "| Level: " << std::setw(17) << level << " |";
             lastLevel = level;
         }
     }
@@ -546,9 +556,12 @@ public:
 
     void resetDrawnFlags() {
         borderDrawn = false;
-        lastScore = -1;
+        headerDrawn = false;
+        lastScore1 = -1;
+        lastScore2 = -1;
         lastHighScore = -1;
-        lastLength = -1;
+        lastLength1 = -1;
+        lastLength2 = -1;
         lastLevel = "";
         wasPaused = false;
     }
@@ -557,10 +570,12 @@ public:
 // ---------------------------- Game (full UI, input fixed) ----------------------------
 class Game {
 private:
-    Snake snake;
+    Snake snake1;
+    Snake snake2;
     Food food;
     GameBoard board;
-    int score;
+    int score1;
+    int score2;
     int highScore;
     bool gameOver;
     bool gameRunning;
@@ -569,6 +584,7 @@ private:
     std::string currentLevel;
     Position oldFoodPos;
     bool foodEaten;
+    int lostPlayer;
 
     void loadHighScore() {
         // stub: could read from a file. Keep 0 if none.
@@ -576,12 +592,14 @@ private:
     }
 
     void saveHighScore() {
-        if (score > highScore) highScore = score;
+        int maxScore = std::max(score1, score2);
+        if (maxScore > highScore) highScore = maxScore;
         // stub: could write to a file
     }
 
     void updateGameSpeed() {
-        int level = score / 100 + 1;
+        int maxScore = std::max(score1, score2);
+        int level = maxScore / 100 + 1;
         gameSpeed = std::max(50, 200 - (level * 15));
         currentLevel = "Level " + std::to_string(level);
     }
@@ -650,28 +668,40 @@ private:
         Console::gotoxy(boardWidth / 2 - 10, boardHeight / 2 + 3);
         std::cout << "|   GAME OVER!     |";
         Console::gotoxy(boardWidth / 2 - 10, boardHeight / 2 + 4);
+        if (lostPlayer == 1) {
+            std::cout << "|  Player 1 Lost!  |";
+        } else if (lostPlayer == 2) {
+            std::cout << "|  Player 2 Lost!  |";
+        } else {
+            std::cout << "| Both Players Lost|";
+        }
+        Console::gotoxy(boardWidth / 2 - 10, boardHeight / 2 + 5);
         std::cout << "+==================+";
 
         Console::setColor(WHITE);
-        Console::gotoxy(boardWidth / 2 - 10, boardHeight / 2 + 5);
-        std::cout << "| Final Score: " << std::setw(3) << score << " |";
         Console::gotoxy(boardWidth / 2 - 10, boardHeight / 2 + 6);
+        std::cout << "| P1 Score:    " << std::setw(3) << score1 << " |";
+        Console::gotoxy(boardWidth / 2 - 10, boardHeight / 2 + 7);
+        std::cout << "| P2 Score:    " << std::setw(3) << score2 << " |";
+        Console::gotoxy(boardWidth / 2 - 10, boardHeight / 2 + 8);
         std::cout << "| High Score:  " << std::setw(3) << highScore << " |";
 
         Console::setColor(LIGHT_RED);
-        Console::gotoxy(boardWidth / 2 - 10, boardHeight / 2 + 7);
+        Console::gotoxy(boardWidth / 2 - 10, boardHeight / 2 + 9);
         std::cout << "+==================+";
 
         Console::setColor(YELLOW);
-        Console::gotoxy(boardWidth / 2 - 15, boardHeight / 2 + 9);
+        Console::gotoxy(boardWidth / 2 - 15, boardHeight / 2 + 11);
         std::cout << "Press 'R' to restart or 'Q' to quit";
     }
 
 public:
-    Game() : board(30, 20),
-             score(0), highScore(0), gameOver(false), gameRunning(true),
+    Game() : snake1(10, 10),
+             snake2(20, 10),
+             board(30, 20),
+             score1(0), score2(0), highScore(0), gameOver(false), gameRunning(true),
              paused(false), gameSpeed(150), currentLevel("Level 1"),
-             oldFoodPos(0,0), foodEaten(false) {
+             oldFoodPos(0,0), foodEaten(false), lostPlayer(0) {
         srand(static_cast<unsigned>(time(nullptr)));
         loadHighScore();
         Console::initialize();
@@ -679,7 +709,7 @@ public:
         std::signal(SIGTERM, sigintHandler);
 
         Console::setWindowSize(80, 30);
-        food.generateFood(board.getWidth(), board.getHeight(), snake.getBody());
+        food.generateFood(board.getWidth(), board.getHeight(), snake1.getBody(), snake2.getBody());
         oldFoodPos = food.getPosition();
     }
 
@@ -695,18 +725,18 @@ public:
         if (key == 0 || key == 224) {
             int k2 = Console::getch_wait();
             switch (k2) {
-                case 72: snake.setDirection(UP); break;
-                case 80: snake.setDirection(DOWN); break;
-                case 75: snake.setDirection(LEFT); break;
-                case 77: snake.setDirection(RIGHT); break;
+                case 72: snake1.setDirection(UP); break;
+                case 80: snake1.setDirection(DOWN); break;
+                case 75: snake1.setDirection(LEFT); break;
+                case 77: snake1.setDirection(RIGHT); break;
             }
         } else {
             key = std::tolower(key);
             switch (key) {
-                case 'w': snake.setDirection(UP); break;
-                case 's': snake.setDirection(DOWN); break;
-                case 'a': snake.setDirection(LEFT); break;
-                case 'd': snake.setDirection(RIGHT); break;
+                case 'w': snake2.setDirection(UP); break;
+                case 's': snake2.setDirection(DOWN); break;
+                case 'a': snake2.setDirection(LEFT); break;
+                case 'd': snake2.setDirection(RIGHT); break;
                 case 'p': paused = !paused; break;
                 case 'q': gameRunning = false; break;
             }
@@ -723,20 +753,20 @@ public:
                     Console::sleep(4);
                     if (Console::kbhit()) {
                         int code = Console::getch();
-                        if (code == 'A') snake.setDirection(UP);
-                        else if (code == 'B') snake.setDirection(DOWN);
-                        else if (code == 'C') snake.setDirection(RIGHT);
-                        else if (code == 'D') snake.setDirection(LEFT);
+                        if (code == 'A') snake1.setDirection(UP);
+                        else if (code == 'B') snake1.setDirection(DOWN);
+                        else if (code == 'C') snake1.setDirection(RIGHT);
+                        else if (code == 'D') snake1.setDirection(LEFT);
                     }
                 }
             }
         } else {
             key = std::tolower(key);
             switch (key) {
-                case 'w': snake.setDirection(UP); break;
-                case 's': snake.setDirection(DOWN); break;
-                case 'a': snake.setDirection(LEFT); break;
-                case 'd': snake.setDirection(RIGHT); break;
+                case 'w': snake2.setDirection(UP); break;
+                case 's': snake2.setDirection(DOWN); break;
+                case 'a': snake2.setDirection(LEFT); break;
+                case 'd': snake2.setDirection(RIGHT); break;
                 case 'p': paused = !paused; break;
                 case 'q': gameRunning = false; break;
             }
@@ -748,26 +778,80 @@ public:
         if (gameOver || paused) return;
 
         foodEaten = false;
-        snake.move();
+        snake1.move();
+        snake2.move();
         updateGameSpeed();
 
-        Position head = snake.getHead();
-        if (!board.isValidPosition(head)) {
+        Position head1 = snake1.getHead();
+        Position head2 = snake2.getHead();
+
+        bool p1Lost = false;
+        bool p2Lost = false;
+
+        // 1. Wall collision checks
+        if (!board.isValidPosition(head1)) {
+            p1Lost = true;
+        }
+        if (!board.isValidPosition(head2)) {
+            p2Lost = true;
+        }
+
+        // 2. Self collision checks
+        if (snake1.checkSelfCollision()) {
+            p1Lost = true;
+        }
+        if (snake2.checkSelfCollision()) {
+            p2Lost = true;
+        }
+
+        // 3. Cross collision checks
+        const auto& body1 = snake1.getBody();
+        const auto& body2 = snake2.getBody();
+
+        for (const auto& segment : body2) {
+            if (head1 == segment) {
+                p1Lost = true;
+                break;
+            }
+        }
+
+        for (const auto& segment : body1) {
+            if (head2 == segment) {
+                p2Lost = true;
+                break;
+            }
+        }
+
+        if (head1 == head2) {
+            p1Lost = true;
+            p2Lost = true;
+        }
+
+        if (p1Lost || p2Lost) {
             gameOver = true;
+            if (p1Lost && p2Lost) {
+                lostPlayer = 3;
+            } else if (p1Lost) {
+                lostPlayer = 1;
+            } else {
+                lostPlayer = 2;
+            }
             return;
         }
 
-        if (snake.checkSelfCollision()) {
-            gameOver = true;
-            return;
-        }
-
-        if (head == food.getPosition()) {
-            score += food.getValue();
-            snake.grow();
+        // 4. Food collision checks
+        if (head1 == food.getPosition()) {
+            score1 += food.getValue();
+            snake1.grow();
             foodEaten = true;
             oldFoodPos = food.getPosition();
-            food.generateFood(board.getWidth(), board.getHeight(), snake.getBody());
+            food.generateFood(board.getWidth(), board.getHeight(), snake1.getBody(), snake2.getBody());
+        } else if (head2 == food.getPosition()) {
+            score2 += food.getValue();
+            snake2.grow();
+            foodEaten = true;
+            oldFoodPos = food.getPosition();
+            food.generateFood(board.getWidth(), board.getHeight(), snake1.getBody(), snake2.getBody());
         }
     }
 
@@ -778,9 +862,10 @@ public:
             board.eraseFood(oldFoodPos);
         }
 
-        board.drawSnake(snake);
+        board.drawSnake(snake1);
+        board.drawSnake(snake2);
         board.drawFood(food);
-        board.displayHeader(score, highScore, snake.getLength(), currentLevel);
+        board.displayHeader(score1, score2, highScore, snake1.getLength(), snake2.getLength(), currentLevel);
         board.displayPauseMessage(paused);
 
         if (gameOver) {
@@ -807,13 +892,16 @@ public:
     }
 
     void restart() {
-        snake.reset();
-        score = 0;
+        snake1.reset();
+        snake2.reset();
+        score1 = 0;
+        score2 = 0;
         gameOver = false;
         paused = false;
         gameSpeed = 150;
         currentLevel = "Level 1";
-        food.generateFood(board.getWidth(), board.getHeight(), snake.getBody());
+        lostPlayer = 0;
+        food.generateFood(board.getWidth(), board.getHeight(), snake1.getBody(), snake2.getBody());
         Console::clearScreen();
         board.resetDrawnFlags();
     }
@@ -843,8 +931,10 @@ public:
         Console::gotoxy(25, 10);
         std::cout << "Thanks for playing Snake Game!";
         Console::gotoxy(25, 11);
-        std::cout << "Final Score: " << score;
+        std::cout << "Player 1 Score: " << score1;
         Console::gotoxy(25, 12);
+        std::cout << "Player 2 Score: " << score2;
+        Console::gotoxy(25, 13);
         std::cout << "High Score: " << highScore;
         Console::gotoxy(0, 15);
         Console::showCursor();

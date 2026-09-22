@@ -238,6 +238,13 @@ struct Position {
 
 enum Direction { UP, DOWN, LEFT, RIGHT, STOP };
 
+// ---------------------------- Random Interface (Object Seam) ----------------------------
+class IRandom {
+public:
+    virtual ~IRandom() = default;
+    virtual int nextInt(int max) { return rand() % max; }
+};
+
 // ---------------------------- Food ----------------------------
 class Food {
 private:
@@ -247,13 +254,16 @@ private:
     int value;
 public:
     Food() : position(0, 0), symbol('*'), color(LIGHT_RED), value(10) {}
-    void generateFood(int width, int height, const std::vector<Position>& snakeBody) {
+    void generateFood(int width, int height, const std::vector<Position>& snakeBody, IRandom* rng = nullptr) {
+        IRandom defaultRng;
+        IRandom* random = rng ? rng : &defaultRng;
+
         do {
-            position.x = rand() % width;
-            position.y = rand() % height;
+            position.x = random->nextInt(width);
+            position.y = random->nextInt(height);
         } while (std::find(snakeBody.begin(), snakeBody.end(), position) != snakeBody.end());
 
-        if (rand() % 10 == 0) {
+        if (random->nextInt(10) == 0) {
             symbol = '$';
             color = LIGHT_YELLOW;
             value = 50;
